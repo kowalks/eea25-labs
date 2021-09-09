@@ -21,7 +21,7 @@
 
 ; Ponto de entrada para RESET.
      .ORG	0 
-            JMP  	RESET
+			JMP  	RESET
 
      .ORG	0x100
 RESET:
@@ -36,11 +36,11 @@ RESET:
 			LDI		R16,HIGH(RAMEND)
 			OUT		SPH,R16
 
-            CALL	USART_INIT					; Inicializa USART.
+			CALL	USART_INIT					; Inicializa USART.
 
 FIRST_PROMPT:
 			LDI		ZH,HIGH(2*PROMPT_INICIAL)	; Imprime ...
-            LDI		ZL,LOW(2*PROMPT_INICIAL)
+			LDI		ZL,LOW(2*PROMPT_INICIAL)
 			CALL	PRINT_STRING
 
 			LDI		R16,'I'						; Opção inicial padrão é incremento
@@ -54,7 +54,7 @@ FOREVER:
 
 CHAR_PROMPT:
 			LDI		ZH,HIGH(2*PROMPT_ESCOLHA)	; Imprime ...
-            LDI		ZL,LOW(2*PROMPT_ESCOLHA)
+			LDI		ZL,LOW(2*PROMPT_ESCOLHA)
 			CALL	PRINT_STRING
 			CALL	USART_TRANSMIT			; Imprime caractere recebido.
 			LDI		R16,RETURN
@@ -70,7 +70,8 @@ WAIT_SWITCH:								; Escuta por ativação do SWITCH
 WAIT_SWITCH_RELEASE:						; Espera SWITCH desativar
 			IN		R16, PIND
 			ANDI	R16,0b10000000
-			BREQ	WAIT_SWITCH_RELEASE
+			BREQ	WAIT_SWITCH_RELEASE
+			
 			LDS		R18,CARACTERE
 			CPI		R18,'d'					; compara com o R18
 			BREQ	DECREMENTS				
@@ -161,10 +162,10 @@ USART_TRANSMIT:
 			PUSH	R17					; Salva R17 na pilha.
 
 WAIT_TRANSMIT:
-            LDS		R17,UCSR0A
-            SBRS	R17,UDRE0			; Aguarda BUFFER do transmissor ficar vazio.		
-            RJMP	WAIT_TRANSMIT
-            STS		UDR0,R16			; Escreve dado de R16 no BUFFER.
+			LDS		R17,UCSR0A
+			SBRS	R17,UDRE0			; Aguarda BUFFER do transmissor ficar vazio.		
+			RJMP	WAIT_TRANSMIT
+			STS		UDR0,R16			; Escreve dado de R16 no BUFFER.
 			
 			POP		R17					; Restaura R17 da pilha e retorna.
 			RET
