@@ -1,10 +1,30 @@
-;
-; lab1.asm
-;
-; Created: 9/9/2021 4:03:23 AM
-; Author : vagrant
-;
-
+;*******************************************************************
+;*   LAB1.ASM                                                      *
+;*                                                                 *
+;*   MCU alvo: Atmel ATmega328                                     *
+;*   Frequencia: X-TAL : 16 MHz                                    *
+;*   Compilador: AVR Assembler 2 (Atmel Studio 7.0)                *
+;*                                                                 *
+;*   Descricao:                                                    *
+;*                                                                 *
+;*       Inicializa o Stack Pointer com RAMEND;                    *
+;*       Configura a USART para operar no modo assincrono com      *
+;*            57600 bps,                                           *
+;*            1 stop bit,                                          *
+;*            sem paridade;                                        *
+;*       Fica em loop executando as seguintes tarefas:             *
+;*            1. Emite mensagem solicitando a escolha por          *
+;*               incremento (I) ou decremento (D)                  *
+;*            2. Caso seja escolhida alguma opção, emite mensagem  *
+;*               de confirmação                                    *
+;*            3. Incrementa contador se for pressionado o SWITCH   *
+;*               na porta PD7 e exibe contagem nas portas PD2-PD5  *
+;*            4. Caso tenha overflow ou underflow do contador,     * 
+;*               atualiza display de 7 segmentos em PB0-PB3        *
+;*            4. Vai para o passo 1.                               * 
+;*                                                                 *
+;*                             Created: 09/09/2021 13:30:00        *
+;*******************************************************************
 
 ;***************
 ;* Constantes  *
@@ -27,9 +47,12 @@
 RESET:
 			LDI		R16,0b00111100				; Seleciona PD2 - PD5 como OUTPUT
 			OUT		DDRD,R16
+			LDI		R16,0b00001111				; Seleciona PB0 - PD3 como OUTPUT
+			OUT		DDRB,R16
 			LDI		R20,0b00000000				; Contador (R20) inicial em 0
 			LDI		R22,0b00000000				; Contador de overflow (R22) inicial em 0
 			OUT		PORTD,R20					; Escreve em PORTD
+			OUT		PORTB,R22					; Escreve em PORTD
 			
 			LDI		R16,LOW(RAMEND)				; Inicializa Stack Pointer.
 			OUT		SPL,R16						; Para ATMega328 RAMEND=08ff.
@@ -91,7 +114,7 @@ OUTPUT:
 			LSL		R21
 			LSL		R21
 			OUT		PORTD,R21	; LED output
-			;OUT		PORTE,R22	; SEG Display output
+			OUT		PORTB,R22	; SEG Display output
 			JMP		FOREVER
 
 OVERFLOW:
