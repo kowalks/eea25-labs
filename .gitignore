@@ -1,0 +1,8 @@
+# Proteus backup files
+*.pdsbak
+
+# Amtel Studio bin and workspace files
+Debug
+.vs
+*.componentinfo.xml
+*.workspace
