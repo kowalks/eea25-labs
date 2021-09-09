@@ -15,7 +15,7 @@
 .EQU		LINEFEED = 0x0D			; Descida do cursor.
 
 ;*****************************
-; Segmento de cï¿½digo (FLASH) *
+; Segmento de código (FLASH) *
 ;*****************************
 .CSEG
 
@@ -43,7 +43,7 @@ FIRST_PROMPT:
 			LDI		ZL,LOW(2*PROMPT_INICIAL)
 			CALL 	PRINT_STRING
 
-			LDI		R16,'I'						; Opï¿½ï¿½o inicial padrï¿½o ï¿½ incremento
+			LDI		R16,'I'						; Opção inicial padrão é incremento
 			STS		CARACTERE,R16
 
 FOREVER:
@@ -62,7 +62,7 @@ CHAR_PROMPT:
 			LDI		R16,LINEFEED
 			CALL 	USART_TRANSMIT
 
-WAIT_SWITCH:								; Escuta por ativaï¿½ï¿½o do SWITCH
+WAIT_SWITCH:								; Escuta por ativação do SWITCH
 			IN		R16, PIND
 			ANDI 	R16,0b10000000
 			BRNE 	FOREVER
@@ -87,7 +87,7 @@ DECREMENTS:									; code for decrement
 			BREQ	UNDERFLOW
 			DEC		R20
 OUTPUT:
-			MOV		R21,R20		; R21 = R20<<2 (porque as portas PD0 e PD1 sï¿½o usadas pelo terminal)
+			MOV		R21,R20		; R21 = R20<<2 (porque as portas PD0 e PD1 são usadas pelo terminal)
 			LSL		R21
 			LSL		R21
 			OUT		PORTD,R21	; LED output
@@ -108,7 +108,7 @@ UNDERFLOW:
 ;  PRINT_STRING                                   *
 ;  Subrotina                                      *
 ;  Envia mensagem apontada por Z em CODSEG.       *
-;  O caractere '$' indica o tï¿½rmino da mensagem.  *
+;  O caractere '$' indica o término da mensagem.  *
 ;**************************************************
 PRINT_STRING:
 			PUSH	R16						; Salva o registrador R16.
@@ -116,7 +116,7 @@ PRINT_STRING:
 PRINT_STRING_LOOP:
 			LPM		R16,Z+
 			CPI		R16,'$'
-			BREQ	PRINT_STRING_END		; Se nï¿½o chegou no caractere de tï¿½rmino '$', usa USART.
+			BREQ	PRINT_STRING_END		; Se não chegou no caractere de término '$', usa USART.
 			CALL	USART_TRANSMIT
 			JMP		PRINT_STRING_LOOP
 
@@ -133,7 +133,7 @@ PRINT_STRING_END:
 ;*******************************************
 
 ; Inicializa USART: modo assincrono, 57600 bps 8N1.
-; Os registradores sï¿½o:
+; Os registradores são:
 ;     - UBRR0 (USART0 Baud Rate Register)
 ;     - UCSR0 (USART0 Control Status Register B)
 ;     - UCSR0 (USART0 Control Status Register C)
@@ -173,7 +173,7 @@ WAIT_TRANSMIT:
 ;*******************************************
 ;  USART_RECEIVE                           *
 ;  Subrotina                               *
-;  Aguarda a recepï¿½ï¿½o de dado pela USART   *
+;  Aguarda a recepção de dado pela USART   *
 ;  e retorna com o dado em R16.            *
 ;*******************************************
 
@@ -193,7 +193,7 @@ WAIT_RECEIVE:
 ;*******************************************
 ;  USART_LAZY_RECEIVE                      *
 ;  Subrotina                               *
-;  Recebe os dados pela USART se hï¿½ algum  *
+;  Recebe os dados pela USART se há algum  *
 ;  e retorna com o dado em R16.            *
 ;*******************************************
 
@@ -209,7 +209,7 @@ USART_LAZY_RECEIVE:
 
 ;*******************************************
 ; Strings e mensagens a serem impressas.   *
-;    '$' ï¿½ usado como terminador.          *
+;    '$' é usado como terminador.          *
 ;*******************************************
 
 PROMPT_INICIAL:
@@ -221,7 +221,7 @@ PROMPT_ESCOLHA:
 
 ;************************************
 ; Segmento de dados (RAM)           *
-; Mostra como alocar espaï¿½o na RAM  *
+; Mostra como alocar espaço na RAM  *
 ; para variaveis.                   *
 ;************************************
 .DSEG
