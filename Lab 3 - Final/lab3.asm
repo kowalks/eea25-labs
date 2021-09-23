@@ -1,30 +1,52 @@
-;*******************************************************************
-;*   LAB1.ASM                                                      *
-;*                                                                 *
-;*   MCU alvo: Atmel ATmega2560s                                    *
-;*   Frequencia: X-TAL : 16 MHz                                    *
-;*   Compilador: AVR Assembler 2 (Atmel Studio 7.0)                *
-;*                                                                 *
-;*   Descricao:                                                    *
-;*                                                                 *
-;*       Inicializa o Stack Pointer com RAMEND;                    *
-;*       Configura a USART para operar no modo assincrono com      *
-;*            57600 bps,                                           *
-;*            1 stop bit,                                          *
-;*            sem paridade;                                        *
-;*       Fica em loop executando as seguintes tarefas:             *
-;*            1. Emite mensagem solicitando a escolha por          *
-;*               incremento (I) ou decremento (D)                  *
-;*            2. Caso seja escolhida alguma opção, emite mensagem  *
-;*               de confirmação                                    *
-;*            3. Incrementa contador se for pressionado o SWITCH   *
-;*               na porta PD7 e exibe contagem nas portas PD2-PD5  *
-;*            4. Caso tenha overflow ou underflow do contador,     * 
-;*               atualiza display de 7 segmentos em PB0-PB3        *
-;*            4. Vai para o passo 1.                               * 
-;*                                                                 *
-;*                             Created: 09/09/2021 13:30:00        *
-;*******************************************************************
+;************************************************************************
+;*   LAB3.ASM                                                           *
+;*                                                                      *
+;*   MCU alvo: Atmel ATmega2560s                                        *
+;*   Frequencia: X-TAL : 16 MHz                                         *
+;*   Compilador: AVR Assembler 2 (Atmel Studio 7.0)                     *
+;*                                                                      *
+;*   Implementa projeto de controle de três servomotores independentes  *
+;*     comandados por inteface em terminal por meio de protocolo USART  *
+;*     8N1 para comunicação com o controlador e por pulso Fast PWM      *
+;*     para controle do ângulo de cada servomotor. Para isso, foram     *
+;*     necessários um TIMER1 que recebe pulsos da saída Clk=16MHz/1024  *
+;*     do PRESCALER e conta pulsos de 0 a 39999, de modo a gerar uma    *
+;*     frequência de 50Hz na saída. Em cima desse sinal, o OCR1x é      *
+;*     colocado para modular diferentes larguras de pulso, que corres-  *
+;*     pondem a diferentes ângulos em cada servomotor.                  *
+;*     0 a 15625, valor com o qual OCR1A é inicializado.  Assim,        *
+;*     de 1024 X 15625 = 16000000 em 16000000 pulsos é produzida uma    *
+;*     interrupção (uma interrupção por segundo).                       *
+;*                                                                      *
+;*   Descricao:                                                         *
+;*                                                                      *
+;*       Inicializa o Stack Pointer com RAMEND;                         *
+;*       Configura  as portas de saída em PB dos pulsos e em PD do      *
+;*         terminal                                                     *    
+;*       Configura a USART0 para operar no modo assincrono com          *
+;*            9600 bps,                                                 *
+;*            1 stop bit,                                               *
+;*            sem paridade;                                             *
+;*            interrupções de recebimento de dado                       *
+;*       Inicializa o TIMER1 para operar no Modo 14 para gerar pulsos   *
+;          regulares na frequência de 50Hz                              *
+;*       Inicializa as variáveis CONTx com os valores padrão            *
+;*       Habilita interrupções com "SEI";                               *
+;*                                                                      *
+;*       A parte principal do programa fica em loop puxando o valor     *
+;*         atual das variáveis CONTx para OCR1x.                        *
+;*       Quando há dado chegando pela USART, armazena os caracteres     *
+;*         nos registradores até que se complete cinco caracteres.      *
+;*       Nesse momento, há uma validação para ver se o input segue      *
+;*         o padrão estabelecido e, em caso afirmativo, são feitos      *
+;*         os ajustes necessários em OCR1x para que, por esse canal,    *
+;*         o pulso tenha a largura correta.                             *
+;*       Os valores de OCR1x já foram calculados, e são armazenados     *
+;*         no segmento de dados do controlador.                         *
+;*                                                                      *
+;*                                                                      *
+;*                             Created: 23/09/2021 13:30:00             *
+;************************************************************************
 
 ;***************
 ;* Constantes  *
@@ -34,6 +56,7 @@
    .equ  BAUD_RATE = 103
    .equ  RETURN = 0x0A          ; Retorno do cursor.
    .equ  LINEFEED = 0x0D        ; Descida do cursor.
+   .equ  BACKSPACE = 0x08
    .equ  USART1_INTERRUPT_vect = 0x0048
    .equ  CONST_ICR1 = 39999    ; Constante para o registrador OCR1A do TIMER1.
      
@@ -62,10 +85,15 @@ START:
 
    call  INIT_PORTS             ; Inicializa PORTH.
    call  USART1_INIT            ; Inicializa USART0.
-   call  TIMER1_INIT_MODE14      ; Inicializa TIMER1.
-   call  CONT_INIT
+   call  TIMER1_INIT_MODE14     ; Inicializa TIMER1.
+   call  CONT_INIT              ; Inicializa as variáveis de contagem.
    sei                          ; Habilita interrupções.
 
+;**************************************************************************************
+;                                LOOP PRINCIPAL DO PROGRAMA                           *
+;**************************************************************************************
+; Aqui, ficamos sempre pegando os valores na RAM de CONTx e jogando para OCR1x.
+; Isso é necessário, porque quando o timer atinge OCR1x, o valor é zerado.
 
 FOR_LOOP:
    lds   r16, CONTA
@@ -87,35 +115,47 @@ FOR_LOOP:
 
 
 
+;*************************************************************
+;  INTERRUPÇÃO DEVIDO À CHEGADA DE DADOS POR MEIO DA USART1  *
+;*************************************************************
+
 USART1_INTERRUPT:
    inc   r20
-IF1:
-   cpi   r20, 1
+   lds   r19, udr1           
+IF0:                    ; Se for backspace, apaga o caractere
+   cpi   r19, BACKSPACE
+   brne  IF1
+   dec   r20
+   dec   r20
+   jmp   END_IF
+
+IF1:                    ; Verifica a quantidade de caracteres lidos atualmente
+   cpi   r20, 1         ; Caso seja o primeiro caractere
    brne  IF2
-   lds   r21, udr1
+   mov   r21, r19       ; Armaena em r21
    jmp   END_IF
 IF2:
-   cpi   r20, 2
+   cpi   r20, 2         ; Caso seja o segundo caractere
    brne  IF3
-   lds   r22, udr1
+   mov   r22, r19       ; Armaena em r22
    jmp   END_IF
 IF3:
-   cpi   r20, 3
+   cpi   r20, 3         ; Caso seja o terceiro caractere
    brne  IF4
-   lds   r23, udr1
+   mov   r23, r19       ; Armaena em r23
    jmp   END_IF
 IF4:
-   cpi   r20, 4
+   cpi   r20, 4         ; Caso seja o quarto caractere
    brne  IF5
-   lds   r24, udr1
+   mov   r24, r19       ; Armaena em r24
    call  END_IF
 IF5:
-   cpi   r20, 5
+   cpi   r20, 5         ; Caso seja o quinto caractere
    brne  END_IF
-   lds   r25, udr1
-   call  PROCESS_INPUT
+   mov   r25, r19       ; Armazena em r25
+   call  PROCESS_INPUT  ; Processa o input com cinco caracteres
    push  r16
-   ldi   r16,RETURN
+   ldi   r16,RETURN     ; Transmite Enter (CR e LF)
    call  USART1_TRANSMIT
    ldi   r16,LINEFEED
    call  USART1_TRANSMIT
@@ -124,7 +164,9 @@ END_IF:
    reti
 
 
-
+;*************************************
+; Processamento dos caracteres lidos *
+;*************************************
 PROCESS_INPUT:
    cpi   r21,'S'        ; check protocol
    brne  END_INPUT
@@ -135,8 +177,6 @@ PROCESS_INPUT:
    mul   r24, r21
    add   r25, r0        ; r25 <- r24*10 + r25
 
-
-   sleep
 POSITIVE_ANGLES:
    cpi   r23, '+'
    brne  NEGATIVE_ANGLES
@@ -240,7 +280,7 @@ WAIT_TRANSMIT1:
 ;  e retorna com o dado em R16.            *
 ;*******************************************
 USART1_RECEIVE:
-   push  r17						  ; Salva R17 na pilha.
+   push  r17					; Salva R17 na pilha.
 
 WAIT_RECEIVE1:
    lds   r17,ucsr1a
@@ -248,7 +288,7 @@ WAIT_RECEIVE1:
    rjmp  WAIT_RECEIVE1          ;Aguarda chegada do dado.
    lds   r16,udr1               ;Le dado do BUFFER e retorna.
 
-   pop   r17						  ; Restaura R17 e retorna.
+   pop   r17					; Restaura R17 e retorna.
    ret
 
 
@@ -277,7 +317,7 @@ TIMER1_INIT_MODE14:
 
 
 CONT_INIT:
-   ldi   r16, 184
+   ldi   r16, 183
    ldi   r17, 11
    sts   CONTA+1, r17
    sts   CONTA, r16
@@ -289,6 +329,16 @@ CONT_INIT:
    ret
 
 
+   .org  0x200
+POSL:
+   .db 183,194,205,216,227,239,250,5,16,27,38,49,60,71,83,94,105,116,127,138,149,160,171,183,194,205,216,227,238,249,4,15,27,38,49,60,71,82,93,104,115,127,138,149,160,171,182,193,204,215,227,238,249,4,15,26,37,48,59,71,82,93,104,115,126,137,148,159,171,182,193,204,215,226,237,248,3,15,26,37,48,59,70,81,92,103,115,126,137,148,159, ' '
+POSH:
+   .db 11,11,11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15, ' '
+NEGL:
+   .db 183,172,161,150,139,127,116,105,94,83,72,61,50,39,27,16,5,250,239,228,217,206,195,183,172,161,150,139,128,117,106,95,83,72,61,50,39,28,17,6,251,239,228,217,206,195,184,173,162,151,139,128,117,106,95,84,73,62,51,39,28,17,6,251,240,229,218,207,195,184,173,162,151,140,129,118,107,95,84,73,62,51,40,29,18,7,251,240,229,218,207, ' '
+NEGH:
+   .db 11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,7,7,7,7,7, ' '
+
 ;************************************
 ; Segmento de dados (RAM)           *
 ; Mostra como alocar espaço na RAM  *
@@ -296,25 +346,6 @@ CONT_INIT:
 ;                                   *
 ;************************************
 .dseg
-   .org  0x200
-; POSL:
-;    .db 184,195,206,217,228,240,251,6,17,28,39,50,61,72,84,95,106,117,128,139,150,161,172,184,195,206,217,228,239,250,5,16,28,39,50,61,72,83,94,105,116,128,139,150,161,172,183,194,205,216,228,239,250,5,16,27,38,49,60,72,83,94,105,116,127,138,149,160,172,183,194,205,216,227,238,249,4,16,27,38,49,60,71,82,93,104,116,127,138,149,160
-; POSH:
-;    .db 11,11,11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15
-; NEGL:
-;    .db 184,173,162,151,140,128,117,106,95,84,73,62,51,40,28,17,6,251,240,229,218,207,196,184,173,162,151,140,129,118,107,96,84,73,62,51,40,29,18,7,252,240,229,218,207,196,185,174,163,152,140,129,118,107,96,85,74,63,52,40,29,18,7,252,241,230,219,208,196,185,174,163,152,141,130,119,108,96,85,74,63,52,41,30,19,8,252,241,230,219,208
-; NEGH:
-;    .db 11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,7,7,7,7,7
-
-POSL:
-   .db 184,195,206,217,228,239,251,6,17,28,39,50,61,72,83,95,106,117,128,139,150,161,172,183,195,206,217,228,239,250,5,16,27,39,50,61,72,83,94,105,116,127,139,150,161,172,183,194,205,216,227,239,250,5,16,27,38,49,60,71,83,94,105,116,127,138,149,160,171,183,194,205,216,227,238,249,4,15,27,38,49,60,71,82,93,104,115,127,138,149,160
-POSH:
-   .db 11,11,11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15
-NEGL:
-   .db 184,173,162,151,139,128,117,106,95,84,73,62,51,39,28,17,6,251,240,229,218,207,195,184,173,162,151,140,129,118,107,95,84,73,62,51,40,29,18,7,251,240,229,218,207,196,185,174,163,151,140,129,118,107,96,85,74,63,51,40,29,18,7,252,241,230,219,207,196,185,174,163,152,141,130,119,108,96,85,74,63,52,41,30,19,8,252,241,230,219,208
-NEGH:
-   .db 11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,7,7,7,7,7
-
    .org  0x400
 CONTA:
    .byte 2
@@ -323,11 +354,6 @@ CONTB:
 CONTC:
    .byte 2
 
-   .org 0x600
-STRING:
-   .byte 4
-LENGTH:
-   .byte 1
 
 ;*****************************
 ; Finaliza o programa fonte  *
