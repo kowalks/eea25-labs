@@ -157,7 +157,7 @@ void SlaveModule(void)
             else if (x == '1')
                 OCR1B = signal;
             else
-                OCR1CH = signal;
+                OCR1C = signal;
         }
         else if ((c == 'L') && (x == '0' || x == '1') && (s == 'O') && (a1 == a0) && (a0 == 'F' || a0 == 'N'))
         {
