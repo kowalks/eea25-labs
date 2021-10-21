@@ -122,6 +122,9 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="commit.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="lab7.c">
       <SubType>compile</SubType>
     </Compile>
