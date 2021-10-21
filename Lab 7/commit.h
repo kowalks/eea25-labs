@@ -1,1 +1,1 @@
-#define LAST_COMMIT "<HASH>"
+#define LAST_COMMIT "cf1c0a9569c20ea66cc0d676bc7d4e2cfad45ff0"
