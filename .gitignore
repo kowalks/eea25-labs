@@ -6,3 +6,11 @@ Debug
 .vs
 *.componentinfo.xml
 *.workspace
+
+# Build files
+ZOUT
+list.txt
+map.txt
+mic.txt
+tablabel.txt
+*.hex
