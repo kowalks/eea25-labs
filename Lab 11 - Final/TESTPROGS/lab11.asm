@@ -3,10 +3,16 @@
 ;    Programa teste para as instruções FILLBLOCK, MOVBLOCK, LONGADD e    *
 ;      LONGSUB, que não fazem parte do conjunto de instruções8080/8085.  *
 ;                                                                        *
+;    O objetivo do programa é começar com uma BASE e PARC e realizar as  *
+;      operações:                                                        *
+;               - x0 = BASE                                              *
+;               - xn = 3*x(n-1) - PARC                                   *
+;      O resultado é guardado na RAM em ordem da sequência               *
+;                                                                        *
 ;    FILLBLOCK codificada com o byte [08H]                               *
-;        Preenche BC posicoes da memoria, a partir do endereco HL        *
-;        com a constante A.                                              *
-;        Nao deixa efeitos colaterais em PSW,BC,DE e HL.                 *
+;      Preenche BC posicoes da memoria, a partir do endereco HL          *
+;      com a constante A.                                                *
+;      Nao deixa efeitos colaterais em PSW,BC,DE e HL.                   *
 ;                                                                        *
 ;    LONGADD é codifivada com o byte [18H].                              *
 ;      Soma os numeros de C bytes apontados por HL e DE                  *
