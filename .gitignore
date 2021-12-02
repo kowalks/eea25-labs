@@ -14,3 +14,13 @@ map.txt
 mic.txt
 tablabel.txt
 *.hex
+*.exe
+
+# Test files
+*.pdf
+test*.asm
+HANOI.ASM
+IOPORTS.asm
+
+# Desktop
+*.ini
